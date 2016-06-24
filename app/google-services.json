@@ -1,0 +1,42 @@
+{
+  "project_info": {
+    "project_number": "564715463216",
+    "firebase_url": "https://appidemic-9785b.firebaseio.com",
+    "project_id": "appidemic-9785b",
+    "storage_bucket": "appidemic-9785b.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:564715463216:android:87af329f72b082a0",
+        "android_client_info": {
+          "package_name": "com.example.chente.appidemic"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "564715463216-mrftmjqcs3jubkeqkb2d4qqbdh9dh5g8.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDSo5Q6YEwYPSfU9zNpyFcYnWe79KWcd-A"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 1,
+          "other_platform_oauth_client": []
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
