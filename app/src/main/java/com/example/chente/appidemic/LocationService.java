@@ -3,6 +3,7 @@ package com.example.chente.appidemic;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.location.LocationManager;
@@ -12,21 +13,17 @@ import android.support.v4.content.ContextCompat;
 import android.util.Log;
 import android.widget.Toast;
 
-import com.firebase.geofire.GeoFire;
-import com.firebase.geofire.GeoLocation;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
+import com.google.gson.JsonObject;
+import com.koushikdutta.async.future.FutureCallback;
+import com.koushikdutta.ion.Ion;
 
 public class LocationService extends Service
 {
     private static final String TAG = "GPS";
     private LocationManager mLocationManager = null;
-    private static final int LOCATION_INTERVAL = 1800000; // half hour
+    private static final int LOCATION_INTERVAL = 1000;
     private static final float LOCATION_DISTANCE = 100;   //
     private String id;
-    private FirebaseDatabase database;
-    private DatabaseReference user;
-    private GeoFire geoFire;
 
     private class LocationListener implements android.location.LocationListener
     {
@@ -43,9 +40,39 @@ public class LocationService extends Service
         {
             Log.e(TAG, "onLocationChanged: " + location);
             mLastLocation.set(location);
-//            user.child("latitude").setValue(location.getLatitude());
-//            user.child("longitude").setValue(location.getLongitude());
-            geoFire.setLocation("firebase-hq", new GeoLocation(location.getLatitude(), location.getLongitude()));
+            JsonObject json = new JsonObject();
+            json.addProperty("id", id);
+            json.addProperty("lat", location.getLatitude());
+            json.addProperty("lng", location.getLongitude());
+            Ion.with(getApplicationContext())
+                    .load("http://appidemic.herokuapp.com/sendLocation")
+                    .setJsonObjectBody(json)
+                    .asJsonObject()
+                    .setCallback(new FutureCallback<JsonObject>() {
+                        @Override
+                        public void onCompleted(Exception e, JsonObject result) {
+                            if (e != null) {
+                                // Handle
+                            }
+                            else {
+                                int status = result.get("result").getAsInt();
+                                switch (status) {
+                                    case 1:     // User is infected and infected nobody
+                                        break;
+                                    case 2:     // User is infected and infected people
+                                        int numInfected = result.get("numInfected").getAsInt();
+                                        // TODO: make a notification to say that people have been infected
+                                        break;
+                                    case 3:     // User is healthy and got infected
+                                        // TODO: make a notification to say that you have been infected
+                                        break;
+                                    case 4:     // User is healthy and didn't get infected
+                                        break;
+                                }
+                            }
+                        }
+                    });
+
         }
 
         @Override
@@ -83,8 +110,10 @@ public class LocationService extends Service
     {
         Log.e(TAG, "onStartCommand");
         super.onStartCommand(intent, flags, startId);
-        id = intent.getExtras().getString("id", "No ID Error");
-        user = database.getReference().child(id);
+
+        // get facebook uid from sharedprefs
+        SharedPreferences prefs = getSharedPreferences("Appidemic", MODE_PRIVATE);
+        id = prefs.getString("id", "No ID Error");
 
         return START_STICKY;
     }
@@ -93,9 +122,6 @@ public class LocationService extends Service
     public void onCreate()
     {
         Log.e(TAG, "onCreate");
-
-        // Firebase
-        database = FirebaseDatabase.getInstance();
 
         initializeLocationManager();
         try {

@@ -26,10 +26,7 @@ dependencies {
     compile 'com.android.support:design:24.0.0'
     compile 'com.koushikdutta.ion:ion:2.+'
     compile 'com.facebook.android:facebook-android-sdk:[4,5)'
-    compile 'com.google.firebase:firebase-database:9.0.2'
     compile 'com.android.support:support-v4:24.0.0'
-    compile 'com.firebase:geofire:1.0.0'
-
 }
 
 apply plugin: 'com.google.gms.google-services'
