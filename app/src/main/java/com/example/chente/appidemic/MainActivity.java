@@ -12,6 +12,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.firebase.client.Firebase;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -34,6 +35,7 @@ public class MainActivity extends AppCompatActivity {
                     PERMISSION_ACCESS_FINE_LOCATION);
         }
 
+        Firebase.setAndroidContext(getApplicationContext());
 
 
         // get facebook uid from sharedprefs

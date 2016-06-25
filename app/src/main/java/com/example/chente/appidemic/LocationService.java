@@ -12,6 +12,8 @@ import android.support.v4.content.ContextCompat;
 import android.util.Log;
 import android.widget.Toast;
 
+import com.firebase.geofire.GeoFire;
+import com.firebase.geofire.GeoLocation;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 
@@ -19,11 +21,12 @@ public class LocationService extends Service
 {
     private static final String TAG = "GPS";
     private LocationManager mLocationManager = null;
-    private static final int LOCATION_INTERVAL = 1500;
-    private static final float LOCATION_DISTANCE = 100;
+    private static final int LOCATION_INTERVAL = 1800000; // half hour
+    private static final float LOCATION_DISTANCE = 100;   //
     private String id;
     private FirebaseDatabase database;
     private DatabaseReference user;
+    private GeoFire geoFire;
 
     private class LocationListener implements android.location.LocationListener
     {
@@ -40,7 +43,9 @@ public class LocationService extends Service
         {
             Log.e(TAG, "onLocationChanged: " + location);
             mLastLocation.set(location);
-            user.push().setValue(location);
+//            user.child("latitude").setValue(location.getLatitude());
+//            user.child("longitude").setValue(location.getLongitude());
+            geoFire.setLocation("firebase-hq", new GeoLocation(location.getLatitude(), location.getLongitude()));
         }
 
         @Override
@@ -79,8 +84,6 @@ public class LocationService extends Service
         Log.e(TAG, "onStartCommand");
         super.onStartCommand(intent, flags, startId);
         id = intent.getExtras().getString("id", "No ID Error");
-        // Firebase
-        database = FirebaseDatabase.getInstance();
         user = database.getReference().child(id);
 
         return START_STICKY;
@@ -91,6 +94,8 @@ public class LocationService extends Service
     {
         Log.e(TAG, "onCreate");
 
+        // Firebase
+        database = FirebaseDatabase.getInstance();
 
         initializeLocationManager();
         try {
