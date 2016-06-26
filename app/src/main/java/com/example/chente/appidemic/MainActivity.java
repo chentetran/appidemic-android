@@ -1,6 +1,7 @@
 package com.example.chente.appidemic;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -20,6 +21,8 @@ import com.koushikdutta.ion.Ion;
 public class MainActivity extends AppCompatActivity {
     private static final int PERMISSION_ACCESS_FINE_LOCATION = 1337;
     private String id;
+    private SharedPreferences prefs;
+    private Context this_context;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -34,7 +37,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         // get facebook uid from sharedprefs
-        SharedPreferences prefs = getSharedPreferences("Appidemic", MODE_PRIVATE);
+        prefs = getSharedPreferences("Appidemic", MODE_PRIVATE);
         id = prefs.getString("id", "No ID Error");
 
         if (id.equals("No ID Error")) {             // user id was deleted from shared prefs
@@ -43,10 +46,7 @@ public class MainActivity extends AppCompatActivity {
             finish();
         }
 
-        // Start location-tracking service
-        Intent intent = new Intent(this, LocationService.class);
-        intent.putExtra("id", id);
-        startService(intent);
+        this_context = this;
     }
 
     @Override
@@ -65,23 +65,33 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onCompleted(Exception e, JsonObject result) {
                         if (e != null) {
-                            Toast.makeText(MainActivity.this, "Error getting status", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(MainActivity.this, "Check internet connection", Toast.LENGTH_SHORT).show();
                             Log.d("PostException", e.toString());
                         }
                         else {
                             TextView infectionStatus = (TextView) findViewById(R.id.status);
                             int status = result.get("status").getAsInt();
+                            SharedPreferences.Editor editor = prefs.edit();
                             switch (status) {
                                 case 0: // healthy
                                     // default to case 1
                                 case 1: // healthy
                                     infectionStatus.setText("HEALTHY");
                                     infectionStatus.setTextColor(Color.GREEN);
+                                    editor.putBoolean("infected", false);
+                                    editor.apply();
                                     break;
                                 case 2: // infected
                                     infectionStatus.setText("INFECTED");
                                     infectionStatus.setTextColor(Color.RED);
+                                    editor.putBoolean("infected", true);
+                                    editor.apply();
                             }
+
+                            // Start location-tracking service
+                            Intent intent = new Intent(this_context, LocationService.class);
+                            intent.putExtra("id", id);
+                            startService(intent);
                         }
                     }
                 });

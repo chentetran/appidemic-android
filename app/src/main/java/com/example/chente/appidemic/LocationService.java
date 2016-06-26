@@ -1,12 +1,18 @@
 package com.example.chente.appidemic;
 
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.location.Location;
 import android.location.LocationManager;
+import android.media.RingtoneManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.support.v4.content.ContextCompat;
@@ -21,9 +27,15 @@ public class LocationService extends Service
 {
     private static final String TAG = "GPS";
     private LocationManager mLocationManager = null;
-    private static final int LOCATION_INTERVAL = 1000;
-    private static final float LOCATION_DISTANCE = 100;   //
+    private static final int LOCATION_INTERVAL = 1500;    // milliseconds
+    private static final float LOCATION_DISTANCE = 100;   // meters
     private String id;
+    private Context this_context;
+    private int notificationId = 123;
+    private SharedPreferences prefs;
+    private SharedPreferences.Editor editor;
+    private long[] pattern = {0, 300};
+    private Uri alarmSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
 
     private class LocationListener implements android.location.LocationListener
     {
@@ -35,15 +47,61 @@ public class LocationService extends Service
             mLastLocation = new Location(provider);
         }
 
+
         @Override
         public void onLocationChanged(Location location)
         {
             Log.e(TAG, "onLocationChanged: " + location);
             mLastLocation.set(location);
+
+            // Check sharedPrefs and see if user was infected without knowing
+            // If so, notify!
+            boolean infectedLocal = prefs.getBoolean("infected", false);
+            if (!infectedLocal) {
+                // Check infection on server
+                JsonObject json_id = new JsonObject();
+                json_id.addProperty("id", id);
+                Ion.with(getApplicationContext())
+                        .load("http://appidemic.herokuapp.com/checkInfection")
+                        .setJsonObjectBody(json_id)
+                        .asJsonObject()
+                        .setCallback(new FutureCallback<JsonObject>() {
+                            @Override
+                            public void onCompleted(Exception e, JsonObject result) {
+                                if (e != null) {
+                                    Toast.makeText(LocationService.this, "Check internet connection", Toast.LENGTH_SHORT).show();
+                                    Log.d("PostException", e.toString());
+                                } else {
+                                    int status = result.get("status").getAsInt();
+                                    if (status == 2) { // infected!
+                                        // Change infection locally
+                                        SharedPreferences.Editor editor = prefs.edit();
+                                        editor.putBoolean("infected", true);
+                                        editor.apply();
+
+                                        // Notify user of infection
+                                        Notification.Builder builder = new Notification.Builder(this_context)
+                                                .setSmallIcon(R.drawable.ic_stat_name)
+                                                .setContentText("You were infected!")
+                                                .setContentTitle("The Appidemic grows...")
+                                                .setLights(Color.RED, 500, 500)
+                                                .setVibrate(pattern)
+                                                .setSound(alarmSound);
+                                        Notification notification = builder.build();
+                                        NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+                                        manager.notify(notificationId, notification);
+                                    }
+                                }
+                            }
+                        });
+            }
+
+            // Send location to spread or get infection
             JsonObject json = new JsonObject();
             json.addProperty("id", id);
             json.addProperty("lat", location.getLatitude());
             json.addProperty("lng", location.getLongitude());
+
             Ion.with(getApplicationContext())
                     .load("http://appidemic.herokuapp.com/sendLocation")
                     .setJsonObjectBody(json)
@@ -56,15 +114,50 @@ public class LocationService extends Service
                             }
                             else {
                                 int status = result.get("result").getAsInt();
+                                String message;
+
+                                Notification.Builder builder = new Notification.Builder(this_context)
+                                        .setContentTitle("The Appidemic spreads...")
+                                        .setSmallIcon(R.drawable.ic_stat_name);
+                                Notification notification;
+                                NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+
+                                // Make the notification clickable
+                                Intent intent = new Intent(this_context, MainActivity.class);
+                                PendingIntent pending = PendingIntent.getActivity(this_context, 0, intent, 0);
+                                builder.setContentIntent(pending);
+
+                                // Sounds and Lights
+                                builder.setLights(Color.RED, 500, 500);
+                                builder.setVibrate(pattern);
+                                builder.setSound(alarmSound);
+
                                 switch (status) {
                                     case 1:     // User is infected and infected nobody
                                         break;
                                     case 2:     // User is infected and infected people
-                                        int numInfected = result.get("numInfected").getAsInt();
-                                        // TODO: make a notification to say that people have been infected
+
+                                        // Notification to show that you have infected people
+                                        message = result.get("message").getAsString();
+                                        builder.setContentText(message);
+                                        notification = builder.build();
+                                        manager.notify(notificationId, notification);
+                                            // TODO: make sound and visible dropdown notification
                                         break;
                                     case 3:     // User is healthy and got infected
-                                        // TODO: make a notification to say that you have been infected
+
+                                        // Notification to show that you have been infected
+                                        message = result.get("message").getAsString();
+                                        builder.setContentText(message);
+                                        notification = builder.build();
+                                        manager.notify(notificationId, notification);
+                                            // TODO: make sound and visible dropdown notification
+
+                                        // Change sharedprefs to indicate you were infected
+                                        editor.putBoolean("infected", true);
+                                        editor.apply();
+
+
                                         break;
                                     case 4:     // User is healthy and didn't get infected
                                         break;
@@ -111,9 +204,6 @@ public class LocationService extends Service
         Log.e(TAG, "onStartCommand");
         super.onStartCommand(intent, flags, startId);
 
-        // get facebook uid from sharedprefs
-        SharedPreferences prefs = getSharedPreferences("Appidemic", MODE_PRIVATE);
-        id = prefs.getString("id", "No ID Error");
 
         return START_STICKY;
     }
@@ -121,7 +211,16 @@ public class LocationService extends Service
     @Override
     public void onCreate()
     {
+        // get facebook uid from sharedprefs
+        prefs = getSharedPreferences("Appidemic", MODE_PRIVATE);
+        id = prefs.getString("id", "No ID Error");
         Log.e(TAG, "onCreate");
+
+        // open sharedprefs editor
+        editor = prefs.edit();
+
+        // get context
+        this_context = this;
 
         initializeLocationManager();
         try {
